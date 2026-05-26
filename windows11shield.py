@@ -245,8 +245,37 @@ def disallow_windows_update():
     print("✅ Windows Update blocked")
 
 def delete_rule(name):
-    run_command(f'netsh advfirewall firewall delete rule name="{name}"')
-    print(f"🗑️ Rule deleted: {name}")
+    if not name or name.strip() == "":
+        print("❌ Rule name cannot be empty.")
+        return
+
+    name = name.strip()
+    
+    print(f"🗑️ Deleting rule: {name}")
+    
+    # 1. Διαγραφή από Windows Firewall
+    code, _, stderr = run_command(f'netsh advfirewall firewall delete rule name="{name}"')
+    
+    # Δοκιμή και για κανόνες με _OUT / _IN (όπως στους Microsoft blocks)
+    if code != 0:
+        run_command(f'netsh advfirewall firewall delete rule name="{name}_OUT"')
+        run_command(f'netsh advfirewall firewall delete rule name="{name}_IN"')
+    
+    # 2. Διαγραφή από τη Βάση Δεδομένων (όλους τους πίνακες)
+    con = sql_connection()
+    
+    # AllowedApps
+    con.execute("DELETE FROM AllowedApps WHERE name=?", (name,))
+    # AllowedPorts
+    con.execute("DELETE FROM AllowedPorts WHERE name=?", (name,))
+    # BlockedIPs
+    con.execute("DELETE FROM BlockedIPs WHERE name=?", (name,))
+    # AllowedIPs
+    con.execute("DELETE FROM AllowedIPs WHERE name=?", (name,))
+    
+    con.commit()
+    
+    print(f"✅ Rule '{name}' deleted from Firewall and Database.")
 
 # ====================== STATUS & MANAGEMENT ======================
 def show_status():
