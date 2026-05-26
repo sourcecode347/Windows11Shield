@@ -24,7 +24,6 @@ logo = (r"""
                Windows 11 Shield - Enhanced Firewall Tool
 """)
 
-
 # ====================== CHECK ADMIN ======================
 def is_admin():
     try:
@@ -48,6 +47,8 @@ def sql_table(con):
     cursor.execute("""CREATE TABLE IF NOT EXISTS AllowedPorts 
                       (id INTEGER PRIMARY KEY, name TEXT, port TEXT, proto TEXT, direction TEXT)""")
     cursor.execute("""CREATE TABLE IF NOT EXISTS BlockedIPs 
+                      (id INTEGER PRIMARY KEY, name TEXT, ip TEXT, direction TEXT)""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS AllowedIPs 
                       (id INTEGER PRIMARY KEY, name TEXT, ip TEXT, direction TEXT)""")
     con.commit()
 
@@ -80,7 +81,7 @@ def kill_all_connections():
                 parts = line.split()
                 if len(parts) >= 5:
                     pid = parts[-1].strip()
-                    if pid.isdigit() and int(pid) > 100:  # Protect system critical PIDs
+                    if pid.isdigit() and int(pid) > 100:
                         pids_to_kill.add(pid)
         
         if not pids_to_kill:
@@ -94,8 +95,7 @@ def kill_all_connections():
             code, _, _ = run_command(f"taskkill /F /PID {pid}")
             if code == 0:
                 killed += 1
-            # Small delay to avoid overwhelming the system
-            time.sleep(0.05)  # uncomment if needed
+            time.sleep(0.05)
         
         print(f"✅ Successfully killed {killed} connections.")
         
@@ -105,8 +105,6 @@ def kill_all_connections():
 # ====================== BLOCK MICROSOFT IP RANGES ======================
 def block_microsoft_ip_ranges():
     print("🌐 Downloading latest Microsoft / Azure IP ranges...")
-    
-    # Official Microsoft Azure Service Tags (updated weekly)
     url = "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_20260511.json"
     
     try:
@@ -115,49 +113,41 @@ def block_microsoft_ip_ranges():
         data = response.json()
     except Exception as e:
         print(f"❌ Failed to download IP ranges: {e}")
-        print("Trying fallback Office 365 endpoints...")
-        try:
-            data = requests.get("https://endpoints.office.com/endpoints/worldwide", timeout=20).json()
-        except:
-            print("❌ Both sources failed.")
-            return
+        return
 
     print("🔄 Adding Microsoft block rules... (This may take 30-60 seconds)")
 
     blocked_count = 0
     ranges = []
-
-    # Azure Cloud + Major Services
     for item in data.get("values", []):
         if isinstance(item, dict):
-            name = item.get("name", "")
-            # Block major Microsoft clouds and services
-            if any(x in name.upper() for x in ["AZURECLOUD", "MICROSOFT", "OFFICE", "M365", "DYNAMICS", "POWERPLATFORM"]):
+            name_tag = item.get("name", "")
+            if any(x in name_tag.upper() for x in ["AZURECLOUD", "MICROSOFT", "OFFICE", "M365", "DYNAMICS", "POWERPLATFORM"]):
                 for prefix in item.get("properties", {}).get("addressPrefixes", []):
                     if prefix:
                         ranges.append(prefix)
 
-    # Fallback from Office 365 JSON if needed
-    if not ranges and isinstance(data, list):
-        for service in data:
-            for ip in service.get("ips", []):
-                if ip:
-                    ranges.append(ip)
-
-    # Remove duplicates
     ranges = list(dict.fromkeys(ranges))
 
-    for cidr in ranges[:800]:  # Limit to avoid too many rules (netsh has limits)
-        if not cidr:
-            continue
+    for cidr in ranges[:800]:
+        if not cidr: continue
         name = f"Block_Microsoft_{cidr.replace('/', '_')}"
-        # Block Outbound
         run_command(f'netsh advfirewall firewall add rule name="{name}_OUT" dir=out action=block remoteip={cidr}')
         run_command(f'netsh advfirewall firewall add rule name="{name}_IN" dir=in action=block remoteip={cidr}')
         blocked_count += 1
 
     print(f"✅ Blocked {blocked_count} Microsoft IP ranges successfully!")
-    print("   (Mainly AzureCloud + Microsoft 365 ranges)")
+
+# ====================== NEW: ALLOW IP OR RANGE ======================
+def allow_ip_range(name, ip, direction):
+    if direction in ["out", "both"]:
+        run_command(f'netsh advfirewall firewall add rule name="{name}" dir=out action=allow remoteip={ip}')
+    if direction in ["in", "both"]:
+        run_command(f'netsh advfirewall firewall add rule name="{name}" dir=in action=allow remoteip={ip}')
+    con = sql_connection()
+    con.execute("INSERT INTO AllowedIPs (name, ip, direction) VALUES (?,?,?)", (name, ip, direction))
+    con.commit()
+    print(f"✅ Allowed IP/Range: {name} ({ip})")
 
 # ====================== CORE FUNCTIONS ======================
 def setup():
@@ -249,9 +239,9 @@ def delete_rule(name):
 # ====================== STATUS & MANAGEMENT ======================
 def show_status():
     con = sql_connection()
-    print("\n" + "="*90)
+    print("\n" + "="*100)
     print("                     FIREWALL STATUS")
-    print("="*90)
+    print("="*100)
 
     print("\n📌 ALLOWED APPLICATIONS:")
     apps = con.execute("SELECT id, name, direction FROM AllowedApps").fetchall()
@@ -269,6 +259,14 @@ def show_status():
     else:
         print("   (None)")
 
+    print("\n📌 ALLOWED IPs / RANGES:")
+    allowed_ips = con.execute("SELECT id, name, ip, direction FROM AllowedIPs").fetchall()
+    if allowed_ips:
+        for i, (id_, name, ip, dir_) in enumerate(allowed_ips, 1):
+            print(f"   {i:2d}. {name:<30} IP: {ip:<18} [{dir_.upper()}]")
+    else:
+        print("   (None)")
+
     print("\n🚫 BLOCKED IPs:")
     ips = con.execute("SELECT id, name, ip, direction FROM BlockedIPs").fetchall()
     if ips:
@@ -277,7 +275,7 @@ def show_status():
     else:
         print("   (None)")
 
-    print("="*90)
+    print("="*100)
 
 def unallow_app():
     con = sql_connection()
@@ -333,6 +331,25 @@ def unblock_ip():
     except:
         print("Invalid selection.")
 
+def unallow_ip():
+    con = sql_connection()
+    ips = con.execute("SELECT id, name FROM AllowedIPs").fetchall()
+    if not ips:
+        print("No allowed IPs found.")
+        return
+    for i, (id_, name) in enumerate(ips, 1):
+        print(f"{i:2d}. {name}")
+    try:
+        choice = int(input("\nEnter number to unallow: ")) - 1
+        if 0 <= choice < len(ips):
+            name = ips[choice][1]
+            delete_rule(name)
+            con.execute("DELETE FROM AllowedIPs WHERE name=?", (name,))
+            con.commit()
+            print(f"✅ Unallowed IP: {name}")
+    except:
+        print("Invalid selection.")
+
 # ====================== MAIN MENU ======================
 sql_table(sql_connection())
 
@@ -341,9 +358,9 @@ while True:
     print(logo)
     time.sleep(3)
     os.system('cls')
-    print("="*90)
+    print("="*100)
     print("              Windows 11 Shield - Enhanced Firewall Manager")
-    print("="*90)
+    print("="*100)
     print("1 .  Setup (Block All Traffic)")
     print("2 .  Reset to Default Windows Firewall")
     print("3 .  Allow Application")
@@ -362,10 +379,12 @@ while True:
     print("16.  Kill All Active Connections")
     print("17.  Run CMD")
     print("18.  Block All Microsoft IP Ranges")
+    print("19.  Allow IP or Range")
+    print("20.  Unallow IP")
     print("0 .  Exit")
-    print("="*90)
+    print("="*100)
 
-    choice = input("\nEnter your choice (0-18): ").strip()
+    choice = input("\nEnter your choice (0-20): ").strip()
 
     if choice == "1":
         setup()
@@ -393,6 +412,12 @@ while True:
         d = input("Direction (1=Out, 2=In, 3=Both): ")
         direction = "both" if d == "3" else "out" if d == "1" else "in"
         block_ip(name, ip, direction)
+    elif choice == "19":
+        name = input("Rule name: ")
+        ip_range = input("IP or Range (e.g. 8.8.8.8 or 192.168.0.0/24): ")
+        d = input("Direction (1=Out, 2=In, 3=Both): ")
+        direction = "both" if d == "3" else "out" if d == "1" else "in"
+        allow_ip_range(name, ip_range, direction)
     elif choice == "6":
         allow_windows_update()
     elif choice == "7":
@@ -417,6 +442,8 @@ while True:
         unallow_port()
     elif choice == "15":
         unblock_ip()
+    elif choice == "20":
+        unallow_ip()
     elif choice == "16":
         kill_all_connections()
     elif choice == "17":
