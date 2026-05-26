@@ -384,7 +384,7 @@ while True:
     print("9 .  Backup Current Firewall")
     print("10.  Restore Firewall from Backup")
     print("11.  Netstat (Active Connections)")
-    print("12.  Status (Allowed Apps / Ports / Blocked IPs)")
+    print("12.  Status (Allowed Apps / Ports / IPs / Blocked IPs)")
     print("13.  Unallow Application")
     print("14.  Unallow Port")
     print("15.  Unblock IP")
@@ -461,7 +461,7 @@ while True:
     elif choice == "16":
         kill_all_connections()
     elif choice == "17":
-        cmd = input("SourceCode347 >: ")
+        cmd = input("SourceCode347 > ")
         output = run_command(cmd)
         print(output[1])
     elif choice == "18":
