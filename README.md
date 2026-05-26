@@ -11,3 +11,5 @@ Correct Operation Steps
 3) Setup and block all traffic
 4) Choose which application or port will have access to the Internet
 --------------------------------
+Very good security and privacy script, as you interrupt all communication and can give access to a Browser like Brave and gain privacy in a closed source operating system, like Windows 11 (!)
+--------------------------------
