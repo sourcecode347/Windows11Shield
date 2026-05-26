@@ -158,8 +158,20 @@ def setup():
 
 def reset():
     print("🔄 Resetting to Default Windows Firewall...")
+    
+    # Reset Windows Firewall
     run_command('netsh advfirewall reset')
-    print("✅ Reset completed")
+    
+    # Clear ALL database tables
+    con = sql_connection()
+    con.execute("DELETE FROM AllowedApps")
+    con.execute("DELETE FROM AllowedPorts")
+    con.execute("DELETE FROM BlockedIPs")
+    con.execute("DELETE FROM AllowedIPs")
+    con.commit()
+    
+    print("✅ Firewall reset to default")
+    print("✅ Database cleared (all custom rules removed)")
 
 def backup_firewall(filename="MyFirewallBackup.wfw"):
     if not filename.endswith(".wfw"):
@@ -431,6 +443,8 @@ while True:
         backup_firewall(fname)
     elif choice == "10":
         fname = input("Backup filename to restore: ")
+        reset()
+        time.sleep(1)
         restore_firewall(fname)
     elif choice == "11":
         os.system("netstat -aon | findstr ESTABLISHED")
