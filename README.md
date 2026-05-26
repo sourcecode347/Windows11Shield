@@ -9,7 +9,7 @@ Correct Operation Steps
 1) Run the script as Administrator
 2) First save the Firewall settings
 3) Setup and block all traffic
-4) Choose which application or port will have access to the Internet
+4) Choose which application or port or IP will have access to the Internet
 5) Run CMD
 
         shutdown -r
