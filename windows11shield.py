@@ -113,7 +113,7 @@ def block_microsoft_ip_ranges():
         data = response.json()
     except Exception as e:
         print(f"❌ Failed to download IP ranges: {e}")
-        print(f"✅ Try to Allow Python with choice 3 . Allow Application ! ")
+        print(f"✅ Try to Run it before choice 1 . Setup ! Please Run Reset to Use It ! ")
         return
 
     print("🔄 Adding Microsoft block rules... (This may take 30-60 seconds)")
@@ -130,11 +130,11 @@ def block_microsoft_ip_ranges():
 
     ranges = list(dict.fromkeys(ranges))
 
-    for cidr in ranges[:800]:
+    for cidr in ranges:
         if not cidr: continue
         name = f"Block_Microsoft_{cidr.replace('/', '_')}"
-        run_command(f'netsh advfirewall firewall add rule name="{name}_OUT" dir=out action=block remoteip={cidr}')
-        run_command(f'netsh advfirewall firewall add rule name="{name}_IN" dir=in action=block remoteip={cidr}')
+        run_command(f'netsh advfirewall firewall add rule name="{name}" dir=out action=block remoteip={cidr}')
+        run_command(f'netsh advfirewall firewall add rule name="{name}" dir=in action=block remoteip={cidr}')
         blocked_count += 1
 
     print(f"✅ Blocked {blocked_count} Microsoft IP ranges successfully!")
