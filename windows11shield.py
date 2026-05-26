@@ -58,6 +58,49 @@ def run_command(cmd):
     except Exception as e:
         return -1, "", str(e)
 
+# ====================== KILL ALL CONNECTIONS ======================
+def kill_all_connections():
+    print("⚠️  WARNING: This will kill ALL active network connections!")
+    print("This may disconnect you from the internet, remote sessions, downloads, etc.")
+    confirm = input("\nAre you ABSOLUTELY sure? (type YES to continue): ").strip().upper()
+    
+    if confirm != "YES":
+        print("Operation cancelled.")
+        return
+
+    print("\n🔍 Reading active connections...")
+    try:
+        result = subprocess.run("netstat -ano", shell=True, capture_output=True, text=True, encoding='utf-8', errors='replace')
+        lines = result.stdout.splitlines()
+        
+        pids_to_kill = set()
+        for line in lines:
+            if "ESTABLISHED" in line or "TIME_WAIT" in line:
+                parts = line.split()
+                if len(parts) >= 5:
+                    pid = parts[-1].strip()
+                    if pid.isdigit() and int(pid) > 100:  # Protect system critical PIDs
+                        pids_to_kill.add(pid)
+        
+        if not pids_to_kill:
+            print("No active connections found to kill.")
+            return
+
+        print(f"Found {len(pids_to_kill)} active connections to terminate...")
+        
+        killed = 0
+        for pid in pids_to_kill:
+            code, _, _ = run_command(f"taskkill /F /PID {pid}")
+            if code == 0:
+                killed += 1
+            # Small delay to avoid overwhelming the system
+            time.sleep(0.05)  # uncomment if needed
+        
+        print(f"✅ Successfully killed {killed} connections.")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
 # ====================== CORE FUNCTIONS ======================
 def setup():
     print("🔒 Applying Strict Block All policy...")
@@ -258,13 +301,16 @@ while True:
     print("13.  Unallow Application")
     print("14.  Unallow Port")
     print("15.  Unblock IP")
+    print("16.  Kill All Active Connections")
+    print("17.  Run CMD")
     print("0 .  Exit")
     print("="*90)
 
-    choice = input("\nEnter your choice (0-15): ").strip()
+    choice = input("\nEnter your choice (0-17): ").strip()
 
     if choice == "1":
         setup()
+        kill_all_connections()
     elif choice == "2":
         if input("Are you sure? (y/n): ").lower() == "y":
             reset()
@@ -302,17 +348,23 @@ while True:
         fname = input("Backup filename to restore: ")
         restore_firewall(fname)
     elif choice == "11":
-        os.system("netstat -ano | findstr ESTABLISHED")
+        os.system("netstat -aon | findstr ESTABLISHED")
         input("\nPress Enter...")
     elif choice == "12":
         show_status()
-        input("\nPress Enter to continue...")
+        input("\nPress Enter...")
     elif choice == "13":
         unallow_app()
     elif choice == "14":
         unallow_port()
     elif choice == "15":
         unblock_ip()
+    elif choice == "16":
+        kill_all_connections()
+    elif choice == "17":
+        cmd = input("SourceCode347 >: ")
+        output = run_command(cmd)
+        print(output[1])
     elif choice == "0":
         print("👋 Goodbye!")
         break
