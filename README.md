@@ -16,3 +16,17 @@ Correct Operation Steps
 --------------------------------
 Very good security and privacy script, as you interrupt all communication and can give access to a Browser like Brave and gain privacy in a closed source operating system, like Windows 11 (!)
 --------------------------------
+
+Step 1 )
+
+Select option 9 and save the settings from Firewall
+
+Step 2 )
+
+Install Brave Browser and run option 1. Setup, then allow the application a program with option 3. Allow Application and thus allow Brave to access the Internet.
+We can also allow other applications, IPs and Ports to access the Internet, except for Microsoft.
+------------------------------------------
+Pown Windows 11 (!)
+------------------------------------------
+
+
