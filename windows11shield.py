@@ -116,7 +116,7 @@ def block_microsoft_ip_ranges():
         print(f"✅ Try to Run it before choice 1 . Setup ! Please Run Reset to Use It ! ")
         return
 
-    print("🔄 Adding Microsoft block rules... (This may take 30-60 seconds)")
+    print("🔄 Adding Microsoft block rules... ( This may take a while )")
 
     blocked_count = 0
     ranges = []
