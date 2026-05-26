@@ -1,7 +1,7 @@
 # Windows11Shield
 Windows 11 Shield - Enhanced Firewall Tool
 
-<img src="https://github.com/sourcecode347/Windows11Shield/blob/main/w11s.png" style="width:80%;height:auto;"/>
+<img src="https://github.com/sourcecode347/Windows11Shield/blob/main/w11s.png" style="width:100%;height:auto;"/>
 
 --------------------------------
 Correct Operation Steps
@@ -30,7 +30,7 @@ We can also allow other applications, IPs and Ports to access the Internet, exce
 Pown Windows 11 (!)
 ------------------------------------------
 
-<img src="https://github.com/sourcecode347/Windows11Shield/blob/main/w11s2.png" style="width:80%;height:auto;"/>
+<img src="https://github.com/sourcecode347/Windows11Shield/blob/main/w11s2.png" style="width:100%;height:auto;"/>
 
 ------------------------------------------
 Brave is closed (!)
@@ -40,6 +40,6 @@ Brave is closed (!)
 No active connection (!)
 ------------------------------------------
 
-<img src="https://github.com/sourcecode347/Windows11Shield/blob/main/w11s3.png" style="width:80%;height:auto;"/>
+<img src="https://github.com/sourcecode347/Windows11Shield/blob/main/w11s3.png" style="width:100%;height:auto;"/>
 
 
