@@ -23,6 +23,7 @@ logo = (r"""
                Windows 11 Shield - Enhanced Firewall Tool
 """)
 
+
 # ====================== CHECK ADMIN ======================
 def is_admin():
     try:
@@ -47,16 +48,31 @@ def sql_table(con):
                       (id INTEGER PRIMARY KEY, name TEXT, ip TEXT, direction TEXT)""")
     con.commit()
 
-# ====================== FIREWALL FUNCTIONS ======================
+# ====================== IMPROVED FIREWALL FUNCTIONS ======================
+def run_command(cmd):
+    """Safe command execution with encoding fix"""
+    try:
+        result = subprocess.run(
+            cmd, 
+            shell=True, 
+            capture_output=True, 
+            text=True, 
+            encoding='utf-8', 
+            errors='replace'
+        )
+        return result.returncode, result.stdout, result.stderr
+    except Exception as e:
+        return -1, "", str(e)
+
 def setup():
     print("🔒 Applying Strict Block All policy...")
-    subprocess.run('netsh advfirewall set allprofiles firewallpolicy blockinbound,blockoutbound', shell=True)
-    subprocess.run('netsh advfirewall firewall delete rule name=all', shell=True)
+    run_command('netsh advfirewall set allprofiles firewallpolicy blockinbound,blockoutbound')
+    run_command('netsh advfirewall firewall delete rule name=all')
     print("✅ Firewall is now in Strict Block Mode")
 
 def reset():
     print("🔄 Resetting to Default Windows Firewall...")
-    subprocess.run('netsh advfirewall reset', shell=True)
+    run_command('netsh advfirewall reset')
     print("✅ Reset completed")
 
 def backup_firewall(filename="MyFirewallBackup.wfw"):
@@ -64,11 +80,17 @@ def backup_firewall(filename="MyFirewallBackup.wfw"):
         filename += ".wfw"
     path = Path.cwd() / filename
     print(f"💾 Creating backup to: {path}")
-    result = subprocess.run(f'netsh advfirewall export "{path}"', shell=True, capture_output=True, text=True)
-    if result.returncode == 0:
+    
+    code, stdout, stderr = run_command(f'netsh advfirewall export "{path}"')
+    
+    if code == 0 or Path(path).exists():
         print("✅ Backup created successfully!")
+        if stdout:
+            print(stdout.strip())
     else:
-        print("❌ Backup failed:", result.stderr)
+        print("❌ Backup failed")
+        if stderr:
+            print("Error:", stderr.strip())
 
 def restore_firewall(filename):
     if not filename.endswith(".wfw"):
@@ -77,37 +99,40 @@ def restore_firewall(filename):
     if not path.exists():
         print(f"❌ File not found: {path}")
         return
+    
     print(f"♻️ Restoring from: {path}")
-    result = subprocess.run(f'netsh advfirewall import "{path}"', shell=True, capture_output=True, text=True)
-    if result.returncode == 0:
+    code, stdout, stderr = run_command(f'netsh advfirewall import "{path}"')
+    
+    if code == 0:
         print("✅ Restore completed successfully!")
     else:
-        print("❌ Restore failed:", result.stderr)
+        print("❌ Restore failed")
+        if stderr:
+            print("Error:", stderr.strip())
 
 def allow_app(name, path, direction):
     if direction in ["out", "both"]:
-        subprocess.run(f'netsh advfirewall firewall add rule name="{name}" dir=out program="{path}" action=allow profile=any', shell=True)
+        run_command(f'netsh advfirewall firewall add rule name="{name}" dir=out program="{path}" action=allow profile=any')
     if direction in ["in", "both"]:
-        subprocess.run(f'netsh advfirewall firewall add rule name="{name}" dir=in program="{path}" action=allow profile=any', shell=True)
+        run_command(f'netsh advfirewall firewall add rule name="{name}" dir=in program="{path}" action=allow profile=any')
     print(f"✅ Allowed: {name}")
 
 def allow_port(name, port, proto, direction):
     if direction in ["out", "both"]:
-        subprocess.run(f'netsh advfirewall firewall add rule name="{name}" dir=out protocol={proto} localport={port} action=allow', shell=True)
+        run_command(f'netsh advfirewall firewall add rule name="{name}" dir=out protocol={proto} localport={port} action=allow')
     if direction in ["in", "both"]:
-        subprocess.run(f'netsh advfirewall firewall add rule name="{name}" dir=in protocol={proto} localport={port} action=allow', shell=True)
+        run_command(f'netsh advfirewall firewall add rule name="{name}" dir=in protocol={proto} localport={port} action=allow')
     print(f"✅ Port opened: {name} ({port}/{proto})")
 
 def block_ip(name, ip, direction):
     if direction in ["out", "both"]:
-        subprocess.run(f'netsh advfirewall firewall add rule name="{name}" dir=out action=block remoteip={ip}', shell=True)
+        run_command(f'netsh advfirewall firewall add rule name="{name}" dir=out action=block remoteip={ip}')
     if direction in ["in", "both"]:
-        subprocess.run(f'netsh advfirewall firewall add rule name="{name}" dir=in action=block remoteip={ip}', shell=True)
+        run_command(f'netsh advfirewall firewall add rule name="{name}" dir=in action=block remoteip={ip}')
     print(f"🚫 Blocked IP: {name} ({ip})")
 
 def allow_windows_update():
     print("🔄 Adding rules to allow Windows Update...")
-    # Main services and executables
     rules = [
         ('Windows Update - svchost Out', r'%SystemRoot%\System32\svchost.exe', 'out'),
         ('Windows Update - wuauclt', r'%SystemRoot%\System32\wuauclt.exe', 'out'),
@@ -115,18 +140,17 @@ def allow_windows_update():
     ]
     for name, path, direction in rules:
         allow_app(name, path, direction)
-    # Common ports for updates (HTTPS)
     allow_port("Windows Update HTTPS", "443", "TCP", "out")
     print("✅ Windows Update should now work")
 
 def disallow_windows_update():
     print("🚫 Blocking Windows Update...")
-    subprocess.run('netsh advfirewall firewall add rule name="Block Windows Update" dir=out action=block program="%SystemRoot%\\System32\\svchost.exe" remoteport=80,443', shell=True)
-    subprocess.run('netsh advfirewall firewall add rule name="Block Windows Update wuauclt" dir=out action=block program="%SystemRoot%\\System32\\wuauclt.exe"', shell=True)
+    run_command('netsh advfirewall firewall add rule name="Block Windows Update" dir=out action=block program="%SystemRoot%\\System32\\svchost.exe" remoteport=80,443')
+    run_command('netsh advfirewall firewall add rule name="Block Windows Update wuauclt" dir=out action=block program="%SystemRoot%\\System32\\wuauclt.exe"')
     print("✅ Windows Update is now blocked")
 
 def delete_rule(name):
-    subprocess.run(f'netsh advfirewall firewall delete rule name="{name}"', shell=True)
+    run_command(f'netsh advfirewall firewall delete rule name="{name}"')
     print(f"🗑️ Rule deleted: {name}")
 
 # ====================== MAIN MENU ======================
