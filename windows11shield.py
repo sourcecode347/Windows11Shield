@@ -113,7 +113,7 @@ def block_microsoft_ip_ranges():
         data = response.json()
     except Exception as e:
         print(f"❌ Failed to download IP ranges: {e}")
-		print(f"✅ Try to Allow Python with choice 3 . Allow Application ! ")
+        print(f"✅ Try to Allow Python with choice 3 . Allow Application ! ")
         return
 
     print("🔄 Adding Microsoft block rules... (This may take 30-60 seconds)")
