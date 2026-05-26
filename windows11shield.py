@@ -8,6 +8,7 @@ import subprocess
 import sys
 import sqlite3
 import time
+import requests
 from pathlib import Path
 
 # ====================== ASCII ART ======================
@@ -100,6 +101,63 @@ def kill_all_connections():
         
     except Exception as e:
         print(f"❌ Error: {e}")
+
+# ====================== BLOCK MICROSOFT IP RANGES ======================
+def block_microsoft_ip_ranges():
+    print("🌐 Downloading latest Microsoft / Azure IP ranges...")
+    
+    # Official Microsoft Azure Service Tags (updated weekly)
+    url = "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_20260511.json"
+    
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        print(f"❌ Failed to download IP ranges: {e}")
+        print("Trying fallback Office 365 endpoints...")
+        try:
+            data = requests.get("https://endpoints.office.com/endpoints/worldwide", timeout=20).json()
+        except:
+            print("❌ Both sources failed.")
+            return
+
+    print("🔄 Adding Microsoft block rules... (This may take 30-60 seconds)")
+
+    blocked_count = 0
+    ranges = []
+
+    # Azure Cloud + Major Services
+    for item in data.get("values", []):
+        if isinstance(item, dict):
+            name = item.get("name", "")
+            # Block major Microsoft clouds and services
+            if any(x in name.upper() for x in ["AZURECLOUD", "MICROSOFT", "OFFICE", "M365", "DYNAMICS", "POWERPLATFORM"]):
+                for prefix in item.get("properties", {}).get("addressPrefixes", []):
+                    if prefix:
+                        ranges.append(prefix)
+
+    # Fallback from Office 365 JSON if needed
+    if not ranges and isinstance(data, list):
+        for service in data:
+            for ip in service.get("ips", []):
+                if ip:
+                    ranges.append(ip)
+
+    # Remove duplicates
+    ranges = list(dict.fromkeys(ranges))
+
+    for cidr in ranges[:800]:  # Limit to avoid too many rules (netsh has limits)
+        if not cidr:
+            continue
+        name = f"Block_Microsoft_{cidr.replace('/', '_')}"
+        # Block Outbound
+        run_command(f'netsh advfirewall firewall add rule name="{name}_OUT" dir=out action=block remoteip={cidr}')
+        run_command(f'netsh advfirewall firewall add rule name="{name}_IN" dir=in action=block remoteip={cidr}')
+        blocked_count += 1
+
+    print(f"✅ Blocked {blocked_count} Microsoft IP ranges successfully!")
+    print("   (Mainly AzureCloud + Microsoft 365 ranges)")
 
 # ====================== CORE FUNCTIONS ======================
 def setup():
@@ -303,14 +361,16 @@ while True:
     print("15.  Unblock IP")
     print("16.  Kill All Active Connections")
     print("17.  Run CMD")
+    print("18.  Block All Microsoft IP Ranges")
     print("0 .  Exit")
     print("="*90)
 
-    choice = input("\nEnter your choice (0-17): ").strip()
+    choice = input("\nEnter your choice (0-18): ").strip()
 
     if choice == "1":
         setup()
         kill_all_connections()
+
     elif choice == "2":
         if input("Are you sure? (y/n): ").lower() == "y":
             reset()
@@ -349,10 +409,8 @@ while True:
         restore_firewall(fname)
     elif choice == "11":
         os.system("netstat -aon | findstr ESTABLISHED")
-        input("\nPress Enter...")
     elif choice == "12":
         show_status()
-        input("\nPress Enter...")
     elif choice == "13":
         unallow_app()
     elif choice == "14":
@@ -365,6 +423,8 @@ while True:
         cmd = input("SourceCode347 >: ")
         output = run_command(cmd)
         print(output[1])
+    elif choice == "18":
+        block_microsoft_ip_ranges()
     elif choice == "0":
         print("👋 Goodbye!")
         break
