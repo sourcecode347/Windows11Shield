@@ -40,10 +40,6 @@ Brave is closed (!)
 No active connection (!)
 ------------------------------------------
 
-------------------------------------------
-Microsoft watermark not activated (!)
-------------------------------------------
-
 <img src="https://github.com/sourcecode347/Windows11Shield/blob/main/w11s3.png" style="width:100%;height:auto;"/>
 
 
